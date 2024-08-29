@@ -1,0 +1,88 @@
+## kmeans.mpc
+# Receives input datasets from clients and performs a k-means clustering on them
+# Returns the centroids
+
+from Compiler.types import sint, regint, Array, MemValue
+from Compiler.library import print_ln, do_while, for_range
+from Compiler.util import if_else
+
+PORTNUM = 14000
+
+test = program.args[0]
+num_clients = int(program.args[1])
+n_size = int(program.args[2])
+dim_size = int(program.args[3])
+k_size = int(program.args[4])
+
+print_ln("%s %s %s %s", test, n_size, dim_size, k_size)
+
+def accept_client():
+    client_socket_id = accept_client_connection(PORTNUM)
+    last = regint.read_from_socket(client_socket_id)
+    return client_socket_id, last
+
+def close_connections(number_clients):
+    @for_range(number_clients)
+    def _(i):
+        closeclientconnection(i)
+
+def main():
+    # Start listening for clients
+    listen_for_clients(PORTNUM)
+    print_ln("Listening for clients on base port %s", PORTNUM)
+
+    # Clents socket id (clear integer)
+    client_sockets = Array(num_clients, regint)
+    # Number of clients
+    number_clients = MemValue(regint(0))
+    # Client ids to identify clients
+    client_ids = Array(num_clients, sint)
+    # Keep track of received inputs
+    seen = Array(num_clients, regint)
+    seen.assign_all(0)
+
+    # 2D array to store data points from all clients
+    dataset = Matrix(n_size * num_clients, dim_size, sint)
+    # rx = [[0]*dim_size] * n_size
+
+    # Loop while waiting for each client to connect
+    @do_while
+    def client_connections():
+        client_id, last = accept_client()
+        print_ln("client id %s last %s", client_id, last, print_secrets=True)
+        @if_(client_id >= num_clients)
+        def _():
+            print_ln('client id too high; aborting')
+            crash()
+        client_sockets[client_id] = client_id
+        client_ids[client_id] = client_id
+        seen[client_id] = 1
+        @if_(last == 1)
+        def _():
+            number_clients.write(client_id + 1)
+        return (sum(seen) < number_clients) + (number_clients == 0)
+    
+    # Once all clients have connected, receive data from each
+    print_ln("All clients have connected. Receiving data...")
+
+    for i in range(num_clients):
+        @if_(seen == 1)
+        def receive_data():
+            print_ln("Receiving data from client %s", client_ids[i], print_secrets=True)
+            for j in range(n_size):
+                rx = sint.receive_from_client(3, client_sockets[i])
+                dataset[(i*100) + j] = rx
+                # print_ln("%s", dataset[j], print_secrets=True)
+                dataset[(i*100) + j].print_reveal_nested()
+                print_ln("%s ------------------------------", (i*100) + j)
+    
+    print_ln("Finished receiving data from all clients.")
+    print_ln("Dataset received.")
+
+    # for i in range(n_size * num_clients):
+    #     for j in range(dim_size):
+    #         print_ln("dataset[%s][%s] = %s\n%s", i, j, dataset[i][j], dataset[i][j].reveal(), print_secrets=True)
+
+    close_connections(num_clients)
+
+main()
