@@ -33,8 +33,6 @@ def main():
 
     # Clents socket id (clear integer)
     client_sockets = Array(num_clients, regint)
-    # Number of clients
-    number_clients = MemValue(regint(0))
     # Client ids to identify clients
     client_ids = Array(num_clients, sint)
     # Keep track of received inputs
@@ -57,10 +55,7 @@ def main():
         client_sockets[client_id] = client_id
         client_ids[client_id] = client_id
         seen[client_id] = 1
-        @if_(last == 1)
-        def _():
-            number_clients.write(client_id + 1)
-        return (sum(seen) < number_clients) + (number_clients == 0)
+        return (sum(seen) < num_clients)
     
     # Once all clients have connected, receive data from each
     print_ln("All clients have connected. Receiving data...")
