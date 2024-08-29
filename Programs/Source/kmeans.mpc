@@ -40,8 +40,8 @@ def main():
     seen.assign_all(0)
 
     # 2D array to store data points from all clients
-    dataset = Matrix(n_size * num_clients, dim_size, sint)
-    # rx = [[0]*dim_size] * n_size
+    n_dataset = Matrix(n_size * num_clients, dim_size, sint)
+    k_dataset = Matrix(k_size * num_clients, dim_size, sint)
 
     # Loop while waiting for each client to connect
     @do_while
@@ -63,14 +63,23 @@ def main():
     for i in range(num_clients):
         @if_(seen == 1)
         def receive_data():
-            print_ln("Receiving data from client %s", client_ids[i], print_secrets=True)
+            print_ln("Receiving N from client %s", client_ids[i], print_secrets=True)
             for j in range(n_size):
                 rx = sint.receive_from_client(3, client_sockets[i])
-                dataset[(i*100) + j] = rx
+                n_dataset[(i*n_size) + j] = rx
                 # print_ln("%s", dataset[j], print_secrets=True)
-                dataset[(i*100) + j].print_reveal_nested()
-                print_ln("%s ------------------------------", (i*100) + j)
-    
+                n_dataset[(i*n_size) + j].print_reveal_nested()
+                print_ln("%s ------------------------------", (i*n_size) + j)
+            print_ln("Finished receiving N from client %s", client_ids[i], print_secrets=True)
+            
+            print_ln("Receiving K from client %s", client_ids[i], print_secrets=True)
+            for k in range(k_size):
+                rx = sint.receive_from_client(3, client_sockets[i])
+                k_dataset[(i*k_size) + k] = rx
+                n_dataset[(i*n_size) + k].print_reveal_nested()
+                print_ln("%s ------------------------------", (i*k_size) + k)
+            print_ln("Finished receiving K from client %s", client_ids[i], print_secrets=True)
+            
     print_ln("Finished receiving data from all clients.")
     print_ln("Dataset received.")
 

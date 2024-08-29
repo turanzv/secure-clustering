@@ -42,12 +42,34 @@ void fill_random_values(std::vector<std::vector<int>>& matrix, int n, int dim, i
 }
 
 template<class T, class U>
-void run(const std::vector<std::vector<int>>& n_points, size_t k_size, Client& client)
+void run(const std::vector<std::vector<int>>& n_points, const std::vector<std::vector<int>>& k_points, Client& client)
 {
-    std::cout << "Running MPC computation with " << n_points.size() << " data points and " << k_size << " centroids." << std::endl;
+    std::cout << "Running MPC computation with " << n_points.size() << " data points and " << k_points.size() << " centroids." << std::endl;
+    std::cout << "Sending N" << std::endl;
 
-    // Send each row of the matrix as a separate input to the MPC cluster
+    // Send each row of N as a separate input to the MPC cluster
     for (const auto& row : n_points)
+    {
+        std::vector<T> converted_row;
+        converted_row.reserve(row.size());
+        for (int value : row)
+        {
+            converted_row.push_back(static_cast<T>(value));
+        }
+        std::cout << "Sending row: ";
+        for (const T& val : converted_row)
+        {
+            std::cout << val << " ";
+        }
+        std::cout << std::endl;
+
+        client.send_private_inputs<T>(converted_row);
+    }
+
+    std::cout << "Sending K" << std::endl;
+
+    // Send each row of K as a separate input to the MPC cluster
+    for (const auto& row : k_points)
     {
         std::vector<T> converted_row;
         converted_row.reserve(row.size());
@@ -91,6 +113,7 @@ int main(int argc, char** argv)
     size_t k_size;
     size_t finish;
     std::vector<std::vector<int>> n_points;
+    std::vector<std::vector<int>> k_points;
     int port_base = 14000;
 
     if (argc < 7) {
@@ -116,6 +139,7 @@ int main(int argc, char** argv)
     std::cout << "Finish flag: " << finish << std::endl;
 
     fill_random_values(n_points, n_size, dim);
+    fill_random_values(k_points, k_size, dim);
 
     if (argc > 7)
     {
@@ -166,7 +190,7 @@ int main(int argc, char** argv)
         {
             gfp::init_field(specification.get<bigint>());
             std::cerr << "Using prime " << gfp::pr() << std::endl;
-            run<gfp, gfp>(n_points, k_size, client);
+            run<gfp, gfp>(n_points, k_points, client);
             break;
         }
         case 'R':
@@ -183,13 +207,13 @@ int main(int argc, char** argv)
             switch (R)
             {
                 case 64:
-                    run<Z2<64>, Z2<64>>(n_points, k_size, client);
+                    run<Z2<64>, Z2<64>>(n_points, k_points, client);
                     break;
                 case 104:
-                    run<Z2<104>, Z2<104>>(n_points, k_size, client);
+                    run<Z2<104>, Z2<104>>(n_points, k_points, client);
                     break;
                 case 128:
-                    run<Z2<128>, Z2<128>>(n_points, k_size, client);
+                    run<Z2<128>, Z2<128>>(n_points, k_points, client);
                     break;
                 default:
                     std::cerr << R << "-bit ring not implemented" << std::endl;
