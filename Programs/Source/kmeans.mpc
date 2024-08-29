@@ -85,7 +85,7 @@ def main():
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
                 n_dataset[(i * n_size) + j] = rx
                 n_dataset[(i * n_size) + j].print_reveal_nested()
-                print_ln("N data row %s received from client %s", (i * n_size) + j, client_ids[i])
+                print_ln("N data row %s received from client %s", (i * n_size) + j, client_ids[i], print_secrets=True)
 
             # Receive K data points
             print_ln("Receiving K from client %s", client_ids[i], print_secrets=True)
@@ -93,7 +93,7 @@ def main():
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
                 k_dataset[(i * k_size) + k] = rx
                 k_dataset[(i * k_size) + k].print_reveal_nested()
-                print_ln("K data row %s received from client %s", (i * k_size) + k, client_ids[i])
+                print_ln("K data row %s received from client %s", (i * k_size) + k, client_ids[i], print_secrets=True)
 
     print_ln("Finished receiving data from all clients.")
     print_ln("Dataset received.")
