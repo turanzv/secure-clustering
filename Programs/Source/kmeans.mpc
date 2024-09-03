@@ -1,7 +1,8 @@
 from Compiler.types import sint, regint, Array, MemValue
 from Compiler.library import print_ln, do_while, for_range
 from Compiler.util import if_else
-from math import log2
+from math import log2, ceil
+
 
 # Base port number for client connections
 PORTNUM = 14000
@@ -10,11 +11,14 @@ PORTNUM = 14000
 # dimensions of data points (dim_size), and number of centroids (k_size)
 test = program.args[0]
 num_clients = int(program.args[1])
-n_size = int(program.args[2])
+n_input_size = int(program.args[2])
 dim_size = int(program.args[3])
-k_size = int(program.args[4])
+k_input_size = int(program.args[4])
 
-print_ln("Test: %s, N size: %s, Dim size: %s, K size: %s", test, n_size, dim_size, k_size)
+k_size = k_input_size * num_clients
+n_size = n_input_size * num_clients
+
+print_ln("Test: %s, N size: %s, Dim size: %s, K size: %s", test, n_input_size, dim_size, k_input_size)
 
 def accept_client():
     """
@@ -76,8 +80,8 @@ def main():
     seen.assign_all(0)
 
     # Matrices to store N and K data points from all clients
-    n_dataset = Matrix(n_size * num_clients, dim_size, sint)
-    k_dataset = Matrix(k_size * num_clients, dim_size, sint)
+    n_dataset = Matrix(n_input_size * num_clients, dim_size, sint)
+    k_dataset = Matrix(k_input_size * num_clients, dim_size, sint)
 
     # Loop until all clients have connected
     @do_while
@@ -104,40 +108,51 @@ def main():
         def receive_data():
             # Receive N data points
             print_ln("Receiving N from client %s", client_ids[i], print_secrets=True)
-            for j in range(n_size):
+            for j in range(n_input_size):
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
-                n_dataset[(i * n_size) + j] = rx
-                n_dataset[(i * n_size) + j].print_reveal_nested()
-                print_ln("N data row %s received from client %s", (i * n_size) + j, client_ids[i], print_secrets=True)
+                n_dataset[(i * n_input_size) + j] = rx
+                # n_dataset[(i * n_size) + j].print_reveal_nested()
+                # print_ln("N data row %s received from client %s", (i * n_size) + j, client_ids[i], print_secrets=True)
 
             # Receive K data points
             print_ln("Receiving K from client %s", client_ids[i], print_secrets=True)
-            for k in range(k_size):
+            for k in range(k_input_size):
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
-                k_dataset[(i * k_size) + k] = rx
-                k_dataset[(i * k_size) + k].print_reveal_nested()
-                print_ln("K data row %s received from client %s", (i * k_size) + k, client_ids[i], print_secrets=True)
+                k_dataset[(i * k_input_size) + k] = rx
+                # k_dataset[(i * k_size) + k].print_reveal_nested()
+                # print_ln("K data row %s received from client %s", (i * k_size) + k, client_ids[i], print_secrets=True)
 
     print_ln("Finished receiving data from all clients.")
     print_ln("Dataset received.")
 
-    print_ln("Shuffling rows")
-    n_dataset.secure_shuffle()
+    print_ln("Shuffling rows.")
     k_dataset.secure_shuffle()
 
-    @for_range(k_size)
-    def _(i):
-        k_dataset[i].print_reveal_nested()
+    k_dataset.print_reveal_nested()
 
     print_ln("Starting the clustering.")
     print_ln("Sorting according to a dimension.")
+    k_dataset.sort(key_indices=(2,), batcher=True)
 
-    # tree_depth = log2(k_size)
-    # @for_range(tree_depth) # either a for_wange or a do_while
+    k_dataset.print_reveal_nested()
+
+    print_ln("Building the KD-Tree from K. Greater than or equal to goes to the right")
+    
+    tree_depth = int(ceil(log2(k_size)))
+    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
+    
+    print_ln("Depth: %s", tree_depth)
+
+    for i in range(tree_depth):
+        print_ln("Processing level %s", i)
+        array_list[int(i)].print_reveal_nested()
+
+    # @for_range(k_size)
+    # def _(i):
+    #     k_dataset[i].print_reveal_nested()
+    # @for_range(tree_depth) # either a for_range or a do_while
     # def _(i):
     #     # sort according to a fun dimension
-    #     pass
-
 
     # Close connections to all clients
     close_connections(num_clients)
