@@ -3,7 +3,6 @@ from Compiler.library import print_ln, do_while, for_range
 from Compiler.util import if_else
 from math import log2, ceil
 
-
 # Base port number for client connections
 PORTNUM = 14000
 
@@ -18,12 +17,12 @@ k_input_size = int(program.args[4])
 k_size = k_input_size * num_clients
 n_size = n_input_size * num_clients
 
-print_ln("Test: %s, N size: %s, Dim size: %s, K size: %s", test, n_input_size, dim_size, k_input_size)
+print_ln("Test: %s | N size: %s | Dim size: %s | K size: %s", test, n_input_size, dim_size, k_input_size)
 
 def accept_client():
     """
     Accepts a connection from a client and retrieves the last flag from the socket.
-
+    
     Returns:
         tuple: client_socket_id (regint), last (regint)
     """
@@ -49,15 +48,16 @@ def log2_sint(x: sint, bit_length: int) -> sint:
     Args:
         x: The secret-shared secret integer input.
         bit_length: The bit length of the input (must be known or assumed).
+
     Returns:
-        sint: the integer part of log2(x).
+        sint: The integer part of log2(x).
     """
     bits = x.bit_decompose()
 
-    # initialize result as 0
+    # Initialize result as 0
     log2_result = sint(0)
 
-    # Find the position of the most-significan bit set to 1
+    # Find the position of the most-significant bit set to 1
     @for_range(bit_length)
     def _(i):
         log2_result = i.if_else(bits[i], log2_result)
@@ -65,9 +65,20 @@ def log2_sint(x: sint, bit_length: int) -> sint:
     return log2_result
 
 def build_tree(input, tree_depth):
-    node_count = 2 ** (tree_depth + 1)
+    """
+    Builds a KD-Tree from the input data points.
+
+    Args:
+        input (Matrix): The input data points.
+        tree_depth (int): The depth of the tree.
+    
+    Returns:
+        list: The KD-Tree represented as a list of Arrays.
+    """
+    node_count = 2 ** (tree_depth + 1) - 1
     kd_tree = [Array(dim_size, sint) for _ in range(node_count)]
 
+    # Stack for iterative construction of the KD-Tree
     stack = [(0, input, 0)]
 
     while stack:
@@ -76,8 +87,9 @@ def build_tree(input, tree_depth):
         @if_(len(subset) == 1)
         def _():
             kd_tree[node_index] = subset[0]
-            print_ln("Leaf: %s", node_index)
-            kd_tree[node_index].print_reveal_nested()
+            print_ln("Leaf Node (Index: %s):", node_index)
+            kd_tree[node_index].print_reveal_nested(end=" ")
+            print_ln()
 
         @if_(len(subset) != 1)
         def _():
@@ -89,21 +101,45 @@ def build_tree(input, tree_depth):
 
             kd_tree[node_index] = median_point
 
-            print_ln("node index: %s", node_index)
-            print_ln("mid-node: %s", median_index)
-            median_point.print_reveal_nested()
+            print_ln("Node Index: %s | Median Index: %s", node_index, median_index)
+            median_point.print_reveal_nested(end=" ")
+            print_ln()
 
-            left_subset = subset.get_part(0, median_index)
-            right_subset = subset.get_part(median_index, median_index)
+            # Create Matrices for left and right subsets
+            left_subset = Matrix(median_index, dim_size, sint)
+            right_subset = Matrix(median_index, dim_size, sint)
 
-            left_subset.print_reveal_nested()
-            right_subset.print_reveal_nested()
-                        
+            # Copy values from subset into left_subset and right_subset
+            left_ref = subset.get_part(0, median_index)
+            right_ref = subset.get_part(median_index, len(subset) - median_index)
+
+            for i in range(median_index):
+                left_subset[i].assign_part_vector(left_ref[i], 0)
+
+            for i in range(len(subset) - median_index):
+                right_subset[i].assign_part_vector(right_ref[i], 0)
+
+
+            print_ln("Left Subset (Depth: %s):", depth)
+            for a in left_subset:
+                a.print_reveal_nested(end= " ")
+            print_ln()
+
+            print_ln("Right Subset (Depth: %s):", depth)
+            for a in right_subset:
+                a.print_reveal_nested(end=" ")
+            print_ln()
+
             left_child_index = 2 * node_index + 1
             right_child_index = 2 * node_index + 2
             
             stack.append((left_child_index, left_subset, depth + 1))
             stack.append((right_child_index, right_subset, depth + 1))
+
+            print_ln("Current status of the tree:")
+            for a in kd_tree:
+                a.print_reveal_nested(end=" ")
+            print_ln()
     
     return kd_tree
 
@@ -130,12 +166,12 @@ def main():
     @do_while
     def client_connections():
         client_id, last = accept_client()
-        print_ln("Client ID: %s, Last: %s", client_id, last, print_secrets=True)
+        print_ln("Client Connected: ID: %s | Last Flag: %s", client_id, last, print_secrets=True)
         
         # Ensure client ID is within the expected range
         @if_(client_id >= num_clients)
         def _():
-            print_ln("Client ID too high; aborting")
+            print_ln("Error: Client ID too high. Aborting.")
             crash()
         
         client_sockets[client_id] = client_id
@@ -150,36 +186,29 @@ def main():
         @if_(seen == 1)
         def receive_data():
             # Receive N data points
-            print_ln("Receiving N from client %s", client_ids[i], print_secrets=True)
+            print_ln("Receiving N from Client %s", client_ids[i], print_secrets=True)
             for j in range(n_input_size):
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
                 n_dataset[(i * n_input_size) + j] = rx
-                # n_dataset[(i * n_size) + j].print_reveal_nested()
-                # print_ln("N data row %s received from client %s", (i * n_size) + j, client_ids[i], print_secrets=True)
 
             # Receive K data points
-            print_ln("Receiving K from client %s", client_ids[i], print_secrets=True)
+            print_ln("Receiving K from Client %s", client_ids[i], print_secrets=True)
             for k in range(k_input_size):
                 rx = sint.receive_from_client(dim_size, client_sockets[i])
                 k_dataset[(i * k_input_size) + k] = rx
-                # k_dataset[(i * k_size) + k].print_reveal_nested()
-                # print_ln("K data row %s received from client %s", (i * k_size) + k, client_ids[i], print_secrets=True)
 
     print_ln("Finished receiving data from all clients.")
-    print_ln("Dataset received.")
-
-    print_ln("Shuffling rows.")
+    print_ln("Shuffling rows of K dataset.")
     k_dataset.secure_shuffle()
 
-    print_ln("Starting the clustering.")
-
-    print_ln("Building the KD-Tree from K. Greater than or equal to goes to the right")
+    print_ln("Starting the KD-Tree clustering.")
     tree_depth = int(ceil(log2(len(k_dataset))))
-    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
     kd_tree = build_tree(k_dataset, tree_depth)
 
-    print_ln("")
+    print_ln("KD-Tree Construction Complete. Revealing KD-Tree:")
+
     for i in range(len(kd_tree)):
+        print_str("KD-Tree Node [%s]:", i)
         kd_tree[i].print_reveal_nested()
 
     # Close connections to all clients
