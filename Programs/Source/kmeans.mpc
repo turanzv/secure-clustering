@@ -64,36 +64,48 @@ def log2_sint(x: sint, bit_length: int) -> sint:
     
     return log2_result
 
-def build_tree(input, input_length):
-    tree_depth = int(ceil(log2(input_length)))
-    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
-    median_index = len(input) // 2
+def build_tree(input, tree_depth):
+    node_count = 2 ** (tree_depth + 1)
+    kd_tree = [Array(dim_size, sint) for _ in range(node_count)]
 
-    # TODO make secure
-    sorting_dim = 2
+    stack = [(0, input, 0)]
 
-    print_ln("Starting the clustering.")
+    while stack:
+        node_index, subset, depth = stack.pop()
 
-    print_ln("Depth: %s", tree_depth)
-    print_ln("Median index: %s", median_index)
+        @if_(len(subset) == 1)
+        def _():
+            kd_tree[node_index] = subset[0]
+            print_ln("Leaf: %s", node_index)
+            kd_tree[node_index].print_reveal_nested()
 
-    print_ln("Sorting according to a dimension.")
-    input.sort(key_indices=(2,), batcher=True)
-    input.print_reveal_nested()
-    print_ln("Splitting dim: %s\nSplitting node: %s\nSplitting value: %s", sorting_dim, input[median_index].reveal(), input[median_index][sorting_dim].reveal())
+        @if_(len(subset) != 1)
+        def _():
+            split_dim = depth % dim_size
 
-    input.print_reveal_nested()
+            subset.sort(key_indices=(split_dim,), batcher=True)
+            median_index = len(subset) // 2
+            median_point = subset[median_index]
 
-    child_l = input.get_part(0, median_index)
-    child_r = input.get_part(median_index, median_index)
+            kd_tree[node_index] = median_point
 
-    print_ln("Type of child: %s, len of child: %s, type of child[0]: %s, len of child[0]: %s", type(child_l), len(child_l), type(child_l[0]), len(child_l[0]))
+            print_ln("node index: %s", node_index)
+            print_ln("mid-node: %s", median_index)
+            median_point.print_reveal_nested()
 
-    child_l.print_reveal_nested()
-    child_r.print_reveal_nested()
+            left_subset = subset.get_part(0, median_index)
+            right_subset = subset.get_part(median_index, median_index)
 
-def _build_tree():
-    pass
+            left_subset.print_reveal_nested()
+            right_subset.print_reveal_nested()
+                        
+            left_child_index = 2 * node_index + 1
+            right_child_index = 2 * node_index + 2
+            
+            stack.append((left_child_index, left_subset, depth + 1))
+            stack.append((right_child_index, right_subset, depth + 1))
+    
+    return kd_tree
 
 def main():
     """
@@ -159,8 +171,16 @@ def main():
     print_ln("Shuffling rows.")
     k_dataset.secure_shuffle()
 
+    print_ln("Starting the clustering.")
+
     print_ln("Building the KD-Tree from K. Greater than or equal to goes to the right")
-    build_tree(k_dataset, k_size)
+    tree_depth = int(ceil(log2(len(k_dataset))))
+    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
+    kd_tree = build_tree(k_dataset, tree_depth)
+
+    print_ln("")
+    for i in range(len(kd_tree)):
+        kd_tree[i].print_reveal_nested()
 
     # Close connections to all clients
     close_connections(num_clients)
