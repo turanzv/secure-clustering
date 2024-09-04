@@ -64,6 +64,37 @@ def log2_sint(x: sint, bit_length: int) -> sint:
     
     return log2_result
 
+def build_tree(input, input_length):
+    tree_depth = int(ceil(log2(input_length)))
+    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
+    median_index = len(input) // 2
+
+    # TODO make secure
+    sorting_dim = 2
+
+    print_ln("Starting the clustering.")
+
+    print_ln("Depth: %s", tree_depth)
+    print_ln("Median index: %s", median_index)
+
+    print_ln("Sorting according to a dimension.")
+    input.sort(key_indices=(2,), batcher=True)
+    input.print_reveal_nested()
+    print_ln("Splitting dim: %s\nSplitting node: %s\nSplitting value: %s", sorting_dim, input[median_index].reveal(), input[median_index][sorting_dim].reveal())
+
+    input.print_reveal_nested()
+
+    child_l = input.get_part(0, median_index)
+    child_r = input.get_part(median_index, median_index)
+
+    print_ln("Type of child: %s, len of child: %s, type of child[0]: %s, len of child[0]: %s", type(child_l), len(child_l), type(child_l[0]), len(child_l[0]))
+
+    child_l.print_reveal_nested()
+    child_r.print_reveal_nested()
+
+def _build_tree():
+    pass
+
 def main():
     """
     Main function to handle client connections, receive data from clients, and store it in matrices.
@@ -128,31 +159,8 @@ def main():
     print_ln("Shuffling rows.")
     k_dataset.secure_shuffle()
 
-    k_dataset.print_reveal_nested()
-
-    print_ln("Starting the clustering.")
-    print_ln("Sorting according to a dimension.")
-    k_dataset.sort(key_indices=(2,), batcher=True)
-
-    k_dataset.print_reveal_nested()
-
     print_ln("Building the KD-Tree from K. Greater than or equal to goes to the right")
-    
-    tree_depth = int(ceil(log2(k_size)))
-    array_list = [Array(2<<length, sint).assign_all(sint(0)) for length in range(tree_depth)]
-    
-    print_ln("Depth: %s", tree_depth)
-
-    for i in range(tree_depth):
-        print_ln("Processing level %s", i)
-        array_list[int(i)].print_reveal_nested()
-
-    # @for_range(k_size)
-    # def _(i):
-    #     k_dataset[i].print_reveal_nested()
-    # @for_range(tree_depth) # either a for_range or a do_while
-    # def _(i):
-    #     # sort according to a fun dimension
+    build_tree(k_dataset, k_size)
 
     # Close connections to all clients
     close_connections(num_clients)
