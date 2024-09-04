@@ -15,6 +15,8 @@
 #include <fstream>
 #include <random>
 
+size_t client_id;
+
 /**
  * Fills a matrix with random values.
  *
@@ -27,7 +29,7 @@
 void fill_random_values(std::vector<std::vector<int>>& matrix, int n, int dim, int min_val = 1, int max_val = 100)
 {
     std::cout << "Filling random values in the matrix: " << n << " x " << dim << std::endl;
-    std::mt19937 rng(std::time(nullptr));
+    std::mt19937 rng(std::time(nullptr) + client_id);
     std::uniform_int_distribution<int> dist(min_val, max_val);
     matrix.resize(n, std::vector<int>(dim));
 
@@ -126,7 +128,7 @@ int main(int argc, char** argv)
     std::cout << "Starting kmeans-client..." << std::endl;
 
     // Initialize variables
-    size_t client_id;
+    // size_t client_id;
     int num_mpc_parties;
     size_t n_size;
     size_t dim;
