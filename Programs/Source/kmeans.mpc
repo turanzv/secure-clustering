@@ -17,7 +17,7 @@ k_input_size = int(program.args[4])
 k_size = k_input_size * num_clients
 n_size = n_input_size * num_clients
 
-print_ln("Test: %s | N size: %s | Dim size: %s | K size: %s", test, n_input_size, dim_size, k_input_size)
+# print_ln("Test: %s | N size: %s | Dim size: %s | K size: %s", test, n_input_size, dim_size, k_input_size)
 
 def accept_client():
     """
@@ -76,7 +76,7 @@ def build_tree(input, tree_depth):
         list: The KD-Tree represented as a list of Arrays.
     """
     node_count = 2 ** (tree_depth + 1) - 1
-    kd_tree = [Array(dim_size, sint) for _ in range(node_count)]
+    kd_tree = Matrix(node_count, dim_size, sint)
 
     # Stack for iterative construction of the KD-Tree
     stack = [(0, input, 0)]
@@ -86,7 +86,7 @@ def build_tree(input, tree_depth):
 
         @if_(len(subset) == 1)
         def _():
-            kd_tree[node_index] = subset[0]
+            kd_tree[node_index].assign(subset[0])
             print_ln("Leaf Node (Index: %s):", node_index)
             kd_tree[node_index].print_reveal_nested(end=" ")
             print_ln()
@@ -95,11 +95,11 @@ def build_tree(input, tree_depth):
         def _():
             split_dim = depth % dim_size
 
-            subset.sort(key_indices=(split_dim,), batcher=True)
+            subset.sort(key_indices=(split_dim,))
             median_index = len(subset) // 2
             median_point = subset[median_index]
 
-            kd_tree[node_index] = median_point
+            kd_tree[node_index].assign(median_point)
 
             print_ln("Node Index: %s | Median Index: %s", node_index, median_index)
             median_point.print_reveal_nested(end=" ")
@@ -120,15 +120,15 @@ def build_tree(input, tree_depth):
                 right_subset[i].assign_part_vector(right_ref[i], 0)
 
 
-            print_ln("Left Subset (Depth: %s):", depth)
-            for a in left_subset:
-                a.print_reveal_nested(end= " ")
-            print_ln()
+            # print_ln("Left Subset (Depth: %s):", depth)
+            # for a in left_subset:
+                # a.print_reveal_nested(end= " ")
+            # print_ln()
 
-            print_ln("Right Subset (Depth: %s):", depth)
-            for a in right_subset:
-                a.print_reveal_nested(end=" ")
-            print_ln()
+            # print_ln("Right Subset (Depth: %s):", depth)
+            # for a in right_subset:
+                # a.print_reveal_nested(end=" ")
+            # print_ln()
 
             left_child_index = 2 * node_index + 1
             right_child_index = 2 * node_index + 2
@@ -136,12 +136,111 @@ def build_tree(input, tree_depth):
             stack.append((left_child_index, left_subset, depth + 1))
             stack.append((right_child_index, right_subset, depth + 1))
 
-            print_ln("Current status of the tree:")
-            for a in kd_tree:
-                a.print_reveal_nested(end=" ")
-            print_ln()
+            # print_ln("Current status of the tree:")
+            # for a in kd_tree:
+            #     a.print_reveal_nested(end=" ")
+            # print_ln()
     
     return kd_tree
+
+# def nearest_neighbor_search(kd_tree, point, depth=0):
+#     """
+#     Secure approximate nearest-neighbor search in a KD-tree using MP-SPDZ.
+    
+#     Args:
+#         kd_tree (list of Arrays): The KD-tree, represented as a list of Arrays (each Array is a point).
+#         point (Array): The query point for which the nearest neighbor is being searched.
+#         depth (int): The current depth in the KD-tree, used to determine the splitting dimension.
+        
+#     Returns:
+#         sint: The index in the KD-tree of the nearest neighbor.
+#     """
+#     num_points = len(kd_tree)
+#     dim_size = len(point)
+
+#     # Initialize the best distance and best index as very large values
+#     best_dist = sint(2**31 - 1)  # Large value for initial best distance
+#     best_index = regint(-1)  # Invalid index
+
+#     # Stack-based iterative traversal of the KD-tree
+#     stack = [(int(0), depth)]  # Stack to hold nodes to visit (node index, depth)
+
+#     while stack:
+#         node_index, depth = stack.pop()
+
+#         # Current node point and dimension to split by
+#         node_point = kd_tree[node_index]
+#         split_dim = depth % dim_size
+
+#         # Securely compute Euclidean distance between query point and node point
+#         dist = sum((point[i] - node_point[i]) ** 2 for i in range(dim_size))
+
+#         # Update best distance and best index if this node is closer
+#         update_best = dist < best_dist
+#         best_dist = if_else(update_best, dist, best_dist)
+#         best_index = if_else(update_best, node_index, best_index)
+
+#         # Securely determine which subtree to explore
+#         go_left = point[split_dim] < node_point[split_dim]
+
+#         # If going left, visit the left child first, then right child
+#         left_child_index = 2 * node_index + 1
+#         right_child_index = 2 * node_index + 2
+
+#         # Obliviously decide which child to explore first
+#         stack.append((if_else(go_left, right_child_index, left_child_index), depth + 1))
+#         stack.append((if_else(go_left, left_child_index, right_child_index), depth + 1))
+
+#     # Return the best index found
+#     return best_index
+
+def nearest_neighbor_search(kd_tree, point):
+    """
+    Traverse the KD-Tree based on the comparison with the splitting dimension of each node.
+
+    Args:
+        kd_tree (Matrix): The KD-Tree represented as a Matrix.
+        point (Array): The point we are searching for in the KD-Tree.
+
+    Returns:
+        cint: The index in the KD-Tree where the search would end.
+    """
+    node_index = cint(0)  # Start at the root of the KD-Tree (index 0)
+
+    # Calculate the depth of the KD-Tree
+    tree_depth = int(ceil(log2(len(kd_tree))))
+    # print_ln("Starting KD-Tree traversal. Tree depth: %s", tree_depth)
+
+    # Traverse the tree from root to leaf
+    for depth in range(tree_depth):
+        # Get the current node
+        node = kd_tree[node_index]
+        
+        # Debug: Print the current node
+        print_ln("Depth: %s | Traversing node at index: %s", depth, node_index)
+        node.print_reveal_nested()
+
+        # Find the current splitting dimension based on the depth
+        split_dim = depth % dim_size
+        # print_ln("Splitting on dimension: %s", split_dim)
+
+        # Compare the point's value in the split dimension with the node's value
+        go_right = point[split_dim] >= node[split_dim]
+        print_ln("Comparison result (go right): %s", go_right.reveal())
+
+        # Compute the left and right child indices
+        left_index = 2 * node_index + 1
+        right_index = 2 * node_index + 2
+
+        # Choose the next node based on the comparison result
+        node_index = if_else(go_right, right_index, left_index).reveal()
+
+        # Debug: Print the next node index
+        print_ln("Next node index: %s", node_index)
+
+    # Return the final node index where the traversal ends
+    print_ln("Traversal complete. Final node index: %s", node_index)
+    return node_index
 
 def main():
     """
@@ -150,7 +249,7 @@ def main():
     """
     # Start listening for client connections
     listen_for_clients(PORTNUM)
-    print_ln("Listening for clients on base port %s", PORTNUM)
+    # print_ln("Listening for clients on base port %s", PORTNUM)
 
     # Arrays to store client socket IDs, client IDs, and connection status
     client_sockets = Array(num_clients, regint)
@@ -210,7 +309,16 @@ def main():
     for i in range(len(kd_tree)):
         print_str("KD-Tree Node [%s]:", i)
         kd_tree[i].print_reveal_nested()
+    
+    
+    for i in range(n_size):
+        point = n_dataset[i]
+        print_str("Processing data point: ")
+        point.print_reveal_nested()
 
+        best_index = nearest_neighbor_search(kd_tree, point)
+        print_ln("Best index for point: %s", best_index)
+    
     # Close connections to all clients
     close_connections(num_clients)
 
