@@ -100,26 +100,26 @@ void run(char** argv, int prime_length)
     int dim = 3;           // Dimension of each vector (3D coordinates)
 
     // Dynamically allocate matrices
-    int** my_N = new int*[dim];
-    for (int i = 0; i < dim; i++)
-        my_N[i] = new int[my_n_size];
+    int** my_N = new int*[my_n_size];
+    for (int i = 0; i < my_n_size; i++)
+        my_N[i] = new int[dim];
 
-    int** my_K = new int*[dim];
-    for (int i = 0; i < dim; i++)
-        my_K[i] = new int[my_k_size];
+    int** my_K = new int*[my_k_size];
+    for (int i = 0; i < my_k_size; i++)
+        my_K[i] = new int[dim];
 
     // Fill matrices with random values
-    fill_random_values(my_N, dim, my_n_size, my_num);
-    fill_random_values(my_K, dim, my_k_size, my_num);
+    fill_random_values(my_N, my_n_size, dim, my_num);
+    fill_random_values(my_K, my_k_size, dim, my_num);
 
     // Allocate secret-shared matrices
-    T** N = new T*[dim];
-    for (int i = 0; i < dim; i++)
-        N[i] = new T[n_size];
+    T** N = new T*[n_size];
+    for (int i = 0; i < n_size; i++)
+        N[i] = new T[dim];
 
-    T** K = new T*[dim];
-    for (int i = 0; i < dim; i++)
-        K[i] = new T[k_size];
+    T** K = new T*[k_size];
+    for (int i = 0; i < k_size; i++)
+        K[i] = new T[dim];
 
     std::cout << "Parties have set up." << std::endl;
 
@@ -129,14 +129,14 @@ void run(char** argv, int prime_length)
     std::cout << "Reset complete." << std::endl;
 
     // Add local N and K matrices to input and prepare to send to all parties
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < my_n_size; j++) {
+    for (int i = 0; i < my_n_size; i++) {
+        for (int j = 0; j < dim; j++) {
             input.add_from_all(my_N[i][j]);  // Add N values for secret sharing
         }
     }
 
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < my_k_size; j++) {
+    for (int i = 0; i < my_k_size; i++) {
+        for (int j = 0; j < dim; j++) {
             input.add_from_all(my_K[i][j]);  // Add K values for secret sharing
         }
     }
@@ -145,46 +145,55 @@ void run(char** argv, int prime_length)
     input.exchange();
 
     // Finalize and reconstruct secret shares for N matrix
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < my_n_size; j++) {
+    for (int i = 0; i < my_n_size; i++) {
+        for (int j = 0; j < dim; j++) {
             N[i][j] = input.finalize(0);                  // Finalize share from party 0
-            N[i][j + my_n_size] = input.finalize(1);      // Finalize share from party 1
-            N[i][j + (2 * my_n_size)] = input.finalize(2);  // Finalize share from party 2
+            N[i + my_n_size][j] = input.finalize(1);      // Finalize share from party 1
+            N[i + (2 * my_n_size)][j] = input.finalize(2);  // Finalize share from party 2
         }
     }
 
     // Finalize and reconstruct secret shares for N matrix
-    for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < my_k_size; j++) {
+    for (int i = 0; i < my_k_size; i++) {
+        for (int j = 0; j < dim; j++) {
             K[i][j] = input.finalize(0);                  // Finalize share from party 0
-            K[i][j + my_k_size] = input.finalize(1);      // Finalize share from party 1
-            K[i][j + (2 * my_k_size)] = input.finalize(2);  // Finalize share from party 2
+            K[i + my_k_size][j] = input.finalize(1);      // Finalize share from party 1
+            K[i + (2 * my_k_size)][j] = input.finalize(2);  // Finalize share from party 2
         }
     }
 
-    for (int i {0}; i < dim; i++) {
-        for (int j {0}; j < k_size; j++) {
+    for (int i {0}; i < k_size; i++) {
+        for (int j {0}; j < dim; j++) {
             std::cout <<  K[i][j] << std::endl;
         }
     }
 
-    // Convert N to StackedVector<T> for shuffling
-    StackedVector<T> stacked_N;
-    convert_matrix_to_stacked_vector(N, dim, n_size, stacked_N);
-
+    // Instantiate the shuffler
     typename Replicated<T>::Shuffler shuffler(subprocessor);
     typename Replicated<T>::Shuffler::store_type store;
 
-    int handle = shuffler.generate(10, store);
+    // Convert N to StackedVector<T> for shuffling
+    StackedVector<T> stacked_K;
+    convert_matrix_to_stacked_vector(K, k_size, dim, stacked_K);
+    int shuffle_size = k_size * 3;
+
+    int handle = shuffler.generate(k_size, store);
     const auto& shuffle = store.get(handle);
 
-
+    std::cout << "shuffle size: " << shuffle.size() << endl;
+    std::cout << "shuffle[0] size: " << shuffle[0].size() << endl;
+    std::cout << "shuffle[1] size: " << shuffle[1].size() << endl;
     for (size_t i = 0; i < shuffle.size(); i++) {
+        std::cout << "shuffle[] " << i << endl;
         for (size_t j = 0; j < shuffle[i].size(); j++) {
-            std::cout << shuffle[i][j] << " ";
+            std::cout << "shuffle[][] " << j << endl;
+            std::cout << shuffle[i][j] << " " << endl;
         }
-        std::cout << endl;
     }
+
+    // apply the shuffle to the arrays
+    cout << stacked_K.size() << endl;
+    shuffler.apply(stacked_K, shuffle_size, 3, 0, 0, store.get(handle), false);
 
     vector<typename T::open_type> i;
     vector<T> k;
@@ -194,19 +203,19 @@ void run(char** argv, int prime_length)
 
     output.exchange(P);
 
-    for (int i = 0; i < dim; i++)
+    for (int i = 0; i < my_n_size; i++)
         delete[] my_N[i];
     delete[] my_N;
 
-    for (int i = 0; i < dim; i++)
+    for (int i = 0; i < my_k_size; i++)
         delete[] my_K[i];
     delete[] my_K;
 
-    for (int i = 0; i < dim; i++)
+    for (int i = 0; i < n_size; i++)
         delete[] N[i];
     delete[] N;
 
-    for (int i = 0; i < dim; i++)
+    for (int i = 0; i < k_size; i++)
         delete[] K[i];
     delete[] K;
 }
