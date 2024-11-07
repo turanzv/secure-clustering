@@ -99,6 +99,10 @@ void run(char** argv, int prime_length)
     int my_k_size = k_size / 3;  // Size of local K matrix for each party
     int dim = 3;           // Dimension of each vector (3D coordinates)
 
+    /**
+     * STEP 0: GENERATE INPUTS LOCALLY
+     */
+
     // Dynamically allocate matrices
     int** my_N = new int*[my_n_size];
     for (int i = 0; i < my_n_size; i++)
@@ -121,7 +125,11 @@ void run(char** argv, int prime_length)
     for (int i = 0; i < k_size; i++)
         K[i] = new T[dim];
 
-    std::cout << "Parties have set up." << std::endl;
+    std::cout << "Parties have completed local set up." << std::endl;
+
+    /**
+     * STEP 1: SHARE AND SHUFFLE INPUTS
+     */
 
     // Reset the input buffer for sending secret shares
     input.reset_all(P);
@@ -153,7 +161,7 @@ void run(char** argv, int prime_length)
         }
     }
 
-    // Finalize and reconstruct secret shares for N matrix
+    // Finalize and reconstruct secret shares for K matrix
     for (int i = 0; i < my_k_size; i++) {
         for (int j = 0; j < dim; j++) {
             K[i][j] = input.finalize(0);                  // Finalize share from party 0
@@ -195,6 +203,19 @@ void run(char** argv, int prime_length)
     cout << stacked_K.size() << endl;
     shuffler.apply(stacked_K, shuffle_size, 3, 0, 0, store.get(handle), false);
 
+    /**
+     * STEP 2: CREATE THE KD-TREE
+     */
+
+    /**
+     * STEP 3: CLUSTER (TRAVERSE THE KD-TREE)
+     */
+
+    /**
+     * STEP 4: RECALCULATE CENTROIDS
+     */
+
+    // test revealing a type
     vector<typename T::open_type> i;
     vector<T> k;
     k.push_back(K[0][0]);
@@ -202,6 +223,10 @@ void run(char** argv, int prime_length)
     cout << i[0] << endl;
 
     output.exchange(P);
+
+    /**
+     * Now to sort all data points and make a thing 
+     */
 
     for (int i = 0; i < my_n_size; i++)
         delete[] my_N[i];
