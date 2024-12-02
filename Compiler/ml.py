@@ -849,7 +849,7 @@ class Dense(DenseBase):
             prod = MultiArray([N, self.d, self.d_out], sfix)
         else:
             prod = self.f_input
-        max_size = get_program().budget // self.d_out
+        max_size = get_program().budget
         @multithread(self.n_threads, N, max_size)
         def _(base, size):
             X_sub = sfix.Matrix(self.N, self.d_in, address=self.X.address)
@@ -1316,12 +1316,12 @@ class Add(NoVariableLayer):
         self.inputs = inputs
 
     def _forward(self, batch=[0]):
-        assert len(batch) == 1
         @multithread(self.n_threads, self.Y[0].total_size())
         def _(base, size):
-            tmp = sum(inp.Y[batch[0]].get_vector(base, size)
-                      for inp in self.inputs)
-            self.Y[batch[0]].assign_vector(tmp, base)
+            for bb in batch:
+                tmp = sum(inp.Y[bb].get_vector(base, size)
+                          for inp in self.inputs)
+                self.Y[bb].assign_vector(tmp, base)
 
 class FusedBatchNorm(Layer):
     """ Fixed-point fused batch normalization layer (inference only).
@@ -1400,11 +1400,11 @@ class BatchNorm(Layer):
 
     def _output(self, batch, mu, var):
         factor = sfix.Array(len(mu))
-        factor[:] = self.InvertSqrt(var[:] + self.epsilon)
+        factor[:] = self.InvertSqrt(var[:] + self.epsilon) * self.weights[:]
         @for_range_opt_multithread(self.n_threads,
                                    [len(batch), self.X.sizes[1]])
         def _(i, j):
-            tmp = self.weights[:] * (self.X[i][j][:] - mu[:]) * factor[:]
+            tmp = (self.X[i][j][:] - mu[:]) * factor[:]
             self.my_Y[i][j][:] = self.bias[:] + tmp
 
     @_layer_method_call_tape
@@ -2233,7 +2233,7 @@ class Optimizer:
         res.output_stats = 'output_stats' in program.args
         return res
 
-    def __init__(self, layers=[], report_loss=None):
+    def __init__(self, layers=[], report_loss=None, time_layers=False):
         if get_program().options.binary:
             raise CompilerError(
                 'machine learning code not compatible with binary circuits')
@@ -2248,6 +2248,10 @@ class Optimizer:
         self.stopped_on_loss = MemValue(0)
         self.stopped_on_low_loss = MemValue(0)
         self.layers = layers
+        self.time_layers = time_layers
+        if time_layers:
+            for i, layer in enumerate(layers):
+                print('Timer %d: %s' % (100 + i, repr(layer)))
 
     @property
     def layers(self):
@@ -2316,6 +2320,8 @@ class Optimizer:
             if self.time_layers:
                 start_timer(100 + i)
             if i != len(self.layers) - 1 or run_last:
+                for theta in layer.thetas():
+                    theta.alloc()
                 layer.forward(batch=self.batch_for(layer, batch),
                               training=training)
                 if self.print_random_update:
@@ -2665,8 +2671,12 @@ class Optimizer:
         if model_input:
             for layer in self.layers:
                 layer.input_from(0)
-        elif reset:
+        elif reset and not 'no_reset' in program.args:
             self.reset()
+        else:
+            for layer in self.layers:
+                for theta in layer.thetas():
+                    theta.alloc()
         if 'one_iter' in program.args:
             print_float_prec(16)
             self.output_weights()
@@ -2687,6 +2697,8 @@ class Optimizer:
         if 'bench10' in program.args or 'bench1' in program.args:
             n = 1 if 'bench1' in program.args else 10
             print('benchmarking %s iterations' % n)
+            # force allocatoin
+            self.layers[0].X, self.layers[-1].Y
             @for_range(n)
             def _(i):
                 batch = Array.create_from(regint.inc(batch_size))

@@ -532,6 +532,8 @@ def TruncPr(a, k, m, signed=True):
 def TruncPrRing(a, k, m, signed=True):
     if m == 0:
         return a
+    prog = program.Program.prog
+    prog.trunc_pr_warning()
     n_ring = int(program.Program.prog.options.ring)
     comparison.require_ring_size(k, 'truncation')
     if k == n_ring:
@@ -552,7 +554,6 @@ def TruncPrRing(a, k, m, signed=True):
             trunc_pr(res, a, k, m)
         else:
             # extra bit to mask overflow
-            prog = program.Program.prog
             prog.curr_tape.require_bit_length(1)
             if prog.use_edabit() or prog.use_split() > 2:
                 lower = sint.get_random_int(m)
@@ -579,13 +580,14 @@ def TruncPrField(a, k, m):
     if m == 0:
         return a
 
+    program.Program.prog.trunc_pr_warning()
     b = two_power(k-1) + a
     r_prime, r_dprime = types.sint(), types.sint()
     comparison.PRandM(r_dprime, r_prime, [types.sint() for i in range(m)],
                       k, m, use_dabit=False)
     two_to_m = two_power(m)
     r = two_to_m * r_dprime + r_prime
-    c = (b + r).reveal(False)
+    c = (b + r).reveal(True)
     c_prime = c % two_to_m
     a_prime = c_prime - r_prime
     d = (a - a_prime).field_div(two_to_m)

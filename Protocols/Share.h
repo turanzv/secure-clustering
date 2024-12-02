@@ -9,7 +9,6 @@
 using namespace std;
 
 #include "Math/gf2n.h"
-#include "Protocols/SPDZ.h"
 #include "Protocols/SemiShare.h"
 #include "ShareInterface.h"
 
@@ -156,6 +155,8 @@ class Share_ : public ShareInterface
 template<class T>
 class Share : public Share_<SemiShare<T>, SemiShare<T>>
 {
+    typedef Share This;
+
 public:
     typedef Share_<SemiShare<T>, SemiShare<T>> super;
 
@@ -177,10 +178,12 @@ public:
     typedef Direct_MAC_Check<Share> Direct_MC;
     typedef ::Input<Share> Input;
     typedef ::PrivateOutput<Share> PrivateOutput;
+    typedef Beaver<This> BasicProtocol;
     typedef SPDZ<Share> Protocol;
     typedef MascotFieldPrep<Share> LivePrep;
     typedef MascotPrep<Share> RandomPrep;
     typedef MascotTriplePrep<Share> TriplePrep;
+    typedef DummyMatrixPrep<This> MatrixPrep;
 
     static const bool expensive = true;
 
