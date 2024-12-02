@@ -137,7 +137,7 @@ ecdsa-static: static-dir $(patsubst ECDSA/%.cpp,static/%.x,$(wildcard ECDSA/*-ec
 $(LIBRELEASE): Protocols/MalRepRingOptions.o $(PROCESSOR) $(COMMONOBJS) $(TINIER) $(GC)
 	$(AR) -csr $@ $^
 
-CFLAGS += -fPIC
+CFLAGS += -fPIC -DDEBUG_NETWORKING
 LDLIBS += -Wl,-rpath -Wl,$(CURDIR)
 
 $(SHAREDLIB): $(PROCESSOR) $(COMMONOBJS) GC/square64.o GC/Instruction.o
@@ -186,6 +186,12 @@ bankers-bonus-client.x: ExternalIO/bankers-bonus-client.o $(COMMON)
 
 kmeans-client.x: ExternalIO/kmeans-client.o $(COMMON)
 	$(CXX) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+client-example.x: ExternalIO/client-example.o $(COMMON)
+	$(CXX) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+turan-playground.x: Utils/turan-playground.o $(COMMON)
+	$(CXX) -o $@ $(CFLAGS) $^ $(LDLIBS)
 
 simple-offline.x: $(FHEOFFLINE)
 pairwise-offline.x: $(FHEOFFLINE)
