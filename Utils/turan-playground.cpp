@@ -243,6 +243,10 @@ void run(char** argv, int prime_length)
 
     /**
      * STEP 3: CLUSTER (TRAVERSE THE KD-TREE)
+     * 
+     * Requirement: Parties must own a secret share of kd-tree and secret shares of datapoints. 
+     * Rashmi to add SISOPIR here. 
+     * Rashmi to add a function to compute LessThanGarbledCircuit - Yao modification.  
      */
 
     /**
